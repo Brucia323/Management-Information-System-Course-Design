@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dao.BookMapper">
+    <select id="getBookByIsbn" parameterType="string" resultType="beans.BookDetail">
+        SELECT book_id,
+               book_name,
+               book_author,
+               book_press,
+               book_isbn,
+               book_money,
+               book_status,
+               book_publictime,
+               book_rack_time,
+               book_type,
+               book_rack_type,
+               book_rack_position
+        FROM (book LEFT JOIN booktype ON book.book_type_id = booktype.book_type_id)
+                 LEFT JOIN bookrack ON book.book_rack_id = bookrack.book_rack_id
+        WHERE book.book_isbn = #{bookIsbn}
+    </select>
+    <!--批量上架-->
+    <update id="setBookUp">
+        update book
+        set book_status=1,book_rack_time=NOW()
+        where book_status=0 and book_isbn in
+        <foreach collection="array" item="id" index="index" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+    <!--  批量下架-->
+    <update id="setBookDown">
+        update book
+        set book_status=0
+        where book_status=1 and book_isbn in
+        <foreach collection="array" item="id" index="index" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+    <!--获取图书类别-->
+    <select id="getBookType" resultType="beans.BookType">
+        select *
+        from booktype
+    </select>
+
+    <select id="selectTotalByIsbn" resultType="beans.Book22">
+        SELECT *, count(*)as count
+        from view21
+        GROUP BY book_isbn
+    </select>
+    <!--    单本上架-->
+    <update id="upOneBook" parameterType="string">
+        update book
+        set book_status=1,
+            book_rack_time=NOW()
+        where book_id = #{bookId}
+    </update>
+    <!--    单本下架-->
+    <update id="downOneBook" parameterType="string">
+        update book
+        set book_status=0
+        where book_id = #{bookId}
+    </update>
+
+
+    <update id="bookEdit" parameterType="map">
+        update book
+        set book_isbn=#{bookIsbn},
+            book_name=#{bookName},
+            book_money=#{bookMoney},
+            book_publictime=#{bookPublictime},
+            book_type_id=#{bookTypeId},
+            book_press=#{bookPress},
+            book_author=#{bookAuthor}
+        where book_isbn = #{oldIsbn}
+    </update>
+
+    <!--interface 210-->
+    <update id="lost" parameterType="string">
+        update book
+        set book_status=3
+        where book_id = #{bookId}
+    </update>
+    <!--显示所有图书，按ISBN合并（只显示上架和借阅的）-->
+    <select id="selectAllBook" resultType="beans.Book22">
+        SELECT *, count(*)as count
+        FROM book, booktype
+        WHERE book.book_type_id=booktype.book_type_id and book_status in (1, 2)
+        GROUP BY book_isbn
+    </select>
+
+</mapper>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dao.BasicMapper">
+    <select id="getAllStudent" resultType="beans.User">
+        SELECT user_id, college_id, major_id, user_name, user_identity
+        FROM user
+    </select>
+    <select id="getTotalCollege" resultType="beans.College">
+        select *
+        from college
+    </select>
+    <select id="getTotalMajor" resultType="beans.Major">
+        select *
+        from major
+    </select>
+</mapper>

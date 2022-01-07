@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dao.UserMapper">
+
+    <select id="userLogin" resultType="string" parameterType="map">
+        select user_name
+        from user
+        where user_id = #{userId}
+          and user_pwd = #{userPwd}
+    </select>
+
+    <!--    查询有无未归还图书-->
+    <select id="getNoReturnBook" parameterType="string" resultType="int">
+        SELECT count(*)
+        FROM borrow
+        WHERE user_id = #{userId}
+          and borrow_return_time is NULL
+          and (DATE_SUB(borrow_borrow_time, INTERVAL -borrow_keep_time DAY) &lt; NOW())
+    </select>
+
+    <!--  判断有无重复预约  -->
+    <select id="getNoBooking" parameterType="map" resultType="int">
+        SELECT count(*)
+        FROM booking
+        where user_id = #{userId}
+          and book_isbn = #{bookIsbn}
+          and booking_status = 0
+    </select>
+
+    <!--    判断有无罚款未缴-->
+    <select id="getNoTicket" parameterType="string" resultType="int">
+        SELECT count(*)
+        FROM ticket
+        WHERE user_id = #{userId}
+          and ticket_status = 0
+    </select>
+
+    <!--    插入预约记录-->
+    <insert id="setBookingInfo" parameterType="map">
+        INSERT
+        INTO booking(user_id, book_isbn, booking_time)
+        VALUES (#{userId}, #{bookIsbn}, now())
+    </insert>
+
+    <!--    查看预约排名-->
+    <select id="getBookingCount" parameterType="string" resultType="int">
+        SELECT count(*)
+        FROM booking
+        WHERE book_isbn = #{bookIsbn}
+          and booking_status = 0
+    </select>
+    <!--    查看预约记录-->
+    <select id="getBookingInfo" parameterType="string" resultType="beans.BookingInfo">
+        SELECT booking_id,
+               booking.book_isbn,
+               book_name,
+               book_money,
+               book_publictime,
+               book_type,
+               book_press,
+               book_author,
+               booking_time,
+               booking_status
+        FROM (booking LEFT JOIN book ON book.book_isbn = booking.book_isbn)
+                 LEFT JOIN booktype ON book.book_type_id = booktype.book_type_id
+        WHERE user_id = #{userId}
+          and booking_status IN (0, 1)
+        GROUP BY booking_id
+        ORDER BY booking_time desc
+    </select>
+    <!--    取消预约-->
+    <update id="delSubscribe" parameterType="map">
+        UPDATE booking
+        SET booking_status = 2
+        WHERE user_id = #{userId}
+          and book_isbn = #{bookIsbn}
+    </update>
+    <!--    修改密码-->
+    <update id="editPwd" parameterType="map">
+        UPDATE user
+        SET user_pwd = #{newPassword}
+        WHERE user_id = #{userId}
+          and user_pwd = #{oldPassword}
+    </update>
+    <!--    查看可借数量-->
+    <select id="getBorrowBookCount" parameterType="string" resultType="int">
+        SELECT count(*)
+        FROM borrow
+        where user_id = #{userId}
+          and borrow_return_time IS NULL
+    </select>
+    <!--    修改图书状态-->
+    <update id="editBookStatus" parameterType="string">
+        UPDATE book
+        SET book_status=1
+        WHERE book_id = #{bookId}
+    </update>
+    <!--    查天数-->
+    <select id="getDay" parameterType="map" resultType="float">
+        SELECT ((UNIX_TIMESTAMP(DATE_SUB(borrow_borrow_time, INTERVAL -borrow_keep_time DAY))) -
+                UNIX_TIMESTAMP(NOW())) / (60 * 60 * 24) dif_minute
+        FROM borrow
+        WHERE book_id = #{bookId}
+          AND user_id = #{userId}
+          AND borrow_return_time IS NULL
+    </select>
+    <!--    更改还书时间-->
+    <update id="setReturnBookTime" parameterType="string">
+        UPDATE borrow
+        SET borrow_return_time = NOW()
+        WHERE borrow_id = #{borrowId}
+    </update>
+    <!--    查找书的isbn-->
+    <select id="getOneBookIsbn" parameterType="string" resultType="string">
+        SELECT book_isbn
+        FROM book
+        WHERE book_id = #{bookId}
+    </select>
+    <!--    查找可借阅第一人的预约记录id-->
+    <select id="getFirstBooking" parameterType="map" resultType="string">
+        SELECT booking_id
+        FROM booking
+        WHERE user_id = #{userId}
+          AND book_isbn = #{bookIsbn}
+          AND booking_status = 0
+        ORDER BY booking_time LIMIT 0,1
+    </select>
+    <!--    通知可借阅第一人-->
+    <update id="setBookingStatus" parameterType="string">
+        UPDATE booking
+        SET booking_status=1
+        WHERE booking_id = #{bookingId}
+    </update>
+    <!--    添加罚金记录-->
+    <insert id="setUserTicketInfo" parameterType="map">
+        INSERT
+        INTO ticket(user_id, book_id, ticket_money)
+        VALUES (#{userId}, #{bookId}, #{ticketMoney})
+    </insert>
+
+    <!--    interface11-->
+    <select id="compensationBook" parameterType="map" resultType="int">
+        SELECT count(*)
+        FROM book
+        where book_name = #{bookName}
+          and book_isbn = #{ookIsbn}
+          and book_author = #{bookAuthor}
+          and book_money = #{bookMoney}
+          and book_press = #{bookPress}
+          and book_publictime = #{bookPublicTime}
+          and book_type_id = #{bookTypeId}
+    </select>
+
+
+    <!--    查看借阅历史-->
+    <select id="getBorrowInfo" parameterType="string" resultType="beans.BorrowInfo">
+        SELECT borrow_id, borrow.book_id, book_name, borrow_reborrow_time, borrow_borrow_time, borrow_return_time
+        FROM borrow
+                 LEFT JOIN book ON book.book_id = borrow.book_id
+        WHERE user_id = #{userId}
+        ORDER BY borrow_borrow_time DESC
+    </select>
+
+    <!--    续借1.1添加续借时间-->
+    <insert id="getAddBorrowTime1" parameterType="map">
+        UPDATE borrow
+        SET borrow_reborrow_time=NOW(),
+            borrow_keep_time=borrow_keep_time + #{time}
+        WHERE borrow_id = #{borrowId}
+          AND borrow_return_time IS NULL
+    </insert>
+    <!--    查找用户当前所借确定图书的借阅信息-->
+    <select id="getUserBorrowBook" parameterType="string" resultType="beans.BorrowInfo">
+        SELECT borrow_id, borrow.book_id, book_name, borrow_reborrow_time, borrow_borrow_time, borrow_return_time
+        FROM borrow
+                 LEFT JOIN book ON book.book_id = borrow.book_id
+        WHERE borrow_id = #{borrowId}
+    </select>
+    <!--    查荐购表是否有推荐的书-->
+    <select id="getTwoRecommendBook" parameterType="string" resultType="int">
+        SELECT count(*)
+        FROM recommendation_form
+        WHERE book_isbn = #{book_isbn}
+    </select>
+    <!--    图书荐购-->
+    <insert id="setRecommendBook" parameterType="map">
+        INSERT
+        INTO recommendation_form
+        VALUES (#{bookIsbn}, #{bookName}, #{bookAuthor}, #{bookMoney}, #{bookPress}, #{bookPublicTime}, #{bookTypeId},
+                #{userId})
+    </insert>
+    <!--    获取罚金-->
+    <select id="getAllMoney" parameterType="string" resultType="string">
+        SELECT SUM(ticket_money)
+        FROM ticket
+        WHERE user_id = #{userId}
+          AND ticket_status = 0
+    </select>
+
+    <!--    罚金缴纳-->
+    <update id="setAllMoney" parameterType="string">
+        UPDATE ticket
+        SET ticket_time=NOW(),
+            ticket_status=1
+        WHERE user_id = #{userId}
+          AND ticket_time IS NULL
+    </update>
+
+    <!--interface4_2_1-->
+    <select id="interface4_2_1" parameterType="string" resultType="beans.Book">
+        SELECT *
+        FROM book
+        WHERE book_id = #{bookId}
+    </select>
+    <!--    interface4_2_2-->
+    <select id="interface4_2_2" parameterType="string" resultType="int">
+        SELECT count(*)
+        FROM book
+        WHERE book_isbn = #{bookIsbn}
+          and book_status = '1'
+    </select>
+    <!--    查询借书数量-->
+    <select id="getBorrowCountByUserId" parameterType="string" resultType="int">
+        SELECT count(*)
+        FROM borrow
+        WHERE user_id = #{userId}
+          AND borrow_return_time IS NULL
+    </select>
+    <!--    用isbn查询该类书预约人数-->
+    <select id="getBookingByIsbn" parameterType="string" resultType="int">
+        SELECT count(*)
+        FROM booking
+        WHERE book_isbn = #{bookIsbn}
+          AND booking_status IN (0, 1)
+    </select>
+
+</mapper>
